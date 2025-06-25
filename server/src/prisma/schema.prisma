@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  passwordHash        String
+  firstName           String
+  lastName            String
+  phoneNumber         String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  ownedBands          Band[]               @relation("BandCreator")
+  memberships         BandMember[]
+  availabilityRecords Availability[]
+  specificAvailability SpecificAvailability[]
+  attendanceRecords   Attendance[]
+  createdRehearsals   Rehearsal[]          @relation("RehearsalCreator")
+  createdItems        RehearsalItem[]      @relation("ItemCreator")
+  notifications       Notification[]       @relation("UserNotifications")
+}
+
+model Band {
+  id           String       @id @default(uuid())
+  name         String
+  description  String?
+  createdById  String
+  createdBy    User         @relation("BandCreator", fields: [createdById], references: [id])
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  members      BandMember[]
+  rehearsals   Rehearsal[]
+}
+
+model BandMember {
+  id        String   @id @default(uuid())
+  userId    String
+  bandId    String
+  role      Role     @default(MEMBER)
+  joinDate  DateTime @default(now())
+  status    Status   @default(PENDING)
+  user      User     @relation(fields: [userId], references: [id])
+  band      Band     @relation(fields: [bandId], references: [id])
+}
+
+model Availability {
+  id             String   @id @default(uuid())
+  userId         String
+  dayOfWeek      Int      // 0-6 for Sunday-Saturday
+  startTime      String   // HH:MM format
+  endTime        String   // HH:MM format
+  isRecurring    Boolean  @default(true)
+  recurrenceRule String?  // Optional iCal-style recurrence rule
+  user           User     @relation(fields: [userId], references: [id])
+}
+
+model SpecificAvailability {
+  id          String   @id @default(uuid())
+  userId      String
+  date        DateTime
+  startTime   String   // HH:MM format
+  endTime     String   // HH:MM format
+  isAvailable Boolean  @default(true)
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model Rehearsal {
+  id          String          @id @default(uuid())
+  bandId      String
+  title       String
+  description String?
+  location    String?
+  startTime   DateTime
+  endTime     DateTime
+  createdById String
+  status      RehearsalStatus @default(SCHEDULED)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  band        Band            @relation(fields: [bandId], references: [id])
+  createdBy   User            @relation("RehearsalCreator", fields: [createdById], references: [id])
+  attendances Attendance[]
+  items       RehearsalItem[]
+  notifications Notification[] @relation("RehearsalNotifications")
+}
+
+model Attendance {
+  id           String          @id @default(uuid())
+  rehearsalId  String
+  userId       String
+  status       AttendanceStatus @default(NO_RESPONSE)
+  notes        String?
+  updatedAt    DateTime        @updatedAt
+  rehearsal    Rehearsal       @relation(fields: [rehearsalId], references: [id])
+  user         User            @relation(fields: [userId], references: [id])
+}
+
+model RehearsalItem {
+  id              String   @id @default(uuid())
+  rehearsalId     String
+  title           String
+  description     String?
+  durationMinutes Int?
+  order           Int
+  createdById     String
+  rehearsal       Rehearsal @relation(fields: [rehearsalId], references: [id])
+  createdBy       User      @relation("ItemCreator", fields: [createdById], references: [id])
+}
+
+model Notification {
+  id           String           @id @default(uuid())
+  userId       String
+  rehearsalId  String?
+  type         NotificationType
+  channel      NotificationChannel
+  status       NotificationStatus @default(PENDING)
+  sentAt       DateTime?
+  createdAt    DateTime         @default(now())
+  user         User             @relation("UserNotifications", fields: [userId], references: [id])
+  rehearsal    Rehearsal?       @relation("RehearsalNotifications", fields: [rehearsalId], references: [id])
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum Status {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+enum RehearsalStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+enum AttendanceStatus {
+  CONFIRMED
+  DECLINED
+  MAYBE
+  NO_RESPONSE
+}
+
+enum NotificationType {
+  REMINDER
+  UPDATE
+  CANCELLATION
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
